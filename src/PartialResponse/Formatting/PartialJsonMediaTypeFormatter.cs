@@ -3,6 +3,7 @@
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
@@ -25,6 +26,8 @@ namespace PartialResponse.Net.Http.Formatting
     public class PartialJsonMediaTypeFormatter : MediaTypeFormatter
     {
         private readonly HttpRequestMessage _request;
+
+        private readonly IDictionary<string, Regex> _fieldMap = new Dictionary<string, Regex>();
 
         private JsonSerializerSettings _jsonSerializerSettings;
         private int _maxDepth = FormattingUtilities.DefaultMaxDepth;
@@ -92,8 +95,8 @@ namespace PartialResponse.Net.Http.Formatting
         /// Gets the default media type for Json, namely "application/json".
         /// </summary>
         /// <remarks>
-        /// The default media type does not have any <c>charset</c> parameter as 
-        /// the <see cref="Encoding"/> can be configured on a per <see cref="PartialJsonMediaTypeFormatter"/> 
+        /// The default media type does not have any <c>charset</c> parameter as
+        /// the <see cref="Encoding"/> can be configured on a per <see cref="PartialJsonMediaTypeFormatter"/>
         /// instance basis.
         /// </remarks>
         /// <value>
@@ -128,7 +131,7 @@ namespace PartialResponse.Net.Http.Formatting
         public bool IgnoreCase { get; set; }
 
         /// <summary>
-        /// Gets or sets a value indicating whether to indent elements when writing data. 
+        /// Gets or sets a value indicating whether to indent elements when writing data.
         /// </summary>
         public bool Indent { get; set; }
 
@@ -318,7 +321,7 @@ namespace PartialResponse.Net.Http.Formatting
         /// Gets a list of partial response fields for the current request.
         /// </summary>
         /// <param name="request">The request.</param>
-        /// <returns>A <see cref="System.Collections.ObjectModel.Collection{string}"/> that contains the specified fields for the 
+        /// <returns>A <see cref="System.Collections.ObjectModel.Collection{string}"/> that contains the specified fields for the
         /// current request, or null if all fields should by serialized.</returns>
         protected virtual Collection<string> GetPartialResponseFields(HttpRequestMessage request)
         {
@@ -335,7 +338,7 @@ namespace PartialResponse.Net.Http.Formatting
 
                 if (!Fields.TryParse(queryOption, out fields))
                 {
-                    // Not much choice but to throw a HttpResponseException inside a MediaTypeFormatter (no access 
+                    // Not much choice but to throw a HttpResponseException inside a MediaTypeFormatter (no access
                     // to the HttpResponseMessage).
                     throw new HttpResponseException(HttpStatusCode.BadRequest);
                 }
@@ -359,15 +362,23 @@ namespace PartialResponse.Net.Http.Formatting
                 throw new ArgumentNullException("field");
             }
 
-            var pattern = PartialJsonMediaTypeFormatterUtilities.GetRegexPatternForField(field);
-            var regexOptions = RegexOptions.None;
+            Regex value;
 
-            if (IgnoreCase)
+            if (!_fieldMap.TryGetValue(field, out value))
             {
-                regexOptions = RegexOptions.IgnoreCase;
+                var pattern = PartialJsonMediaTypeFormatterUtilities.GetRegexPatternForField(field);
+                var regexOptions = RegexOptions.Compiled;
+
+                if (IgnoreCase)
+                {
+                    regexOptions |= RegexOptions.IgnoreCase;
+                }
+
+                value = new Regex(pattern, regexOptions);
+                _fieldMap.Add(field, value);
             }
 
-            return _fields.Any(f => Regex.IsMatch(f, pattern, regexOptions));
+            return _fields.Any(f => value.IsMatch(f));
         }
 
         /// <summary>

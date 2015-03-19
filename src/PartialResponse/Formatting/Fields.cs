@@ -9,6 +9,8 @@ namespace PartialResponse.Net.Http.Formatting
     {
         private const string ValidationPattern = @"^\s*(\*|([^\/&^*&^,&^\s]+(/[^\/&^*&^,&^\s]+)*(/\*)?))(\s*,\s*(\*|([^\/&^*&^,&^\s]+(/[^\/&^*&^,&^\s]+)*(/\*)?)))*\s*$";
 
+        private static readonly Regex _validationRegex = new Regex(ValidationPattern, RegexOptions.Compiled);
+
         internal static bool TryParse(string s, out Collection<string> result)
         {
             var temp = new Collection<string>();
@@ -30,7 +32,7 @@ namespace PartialResponse.Net.Http.Formatting
 
         private static bool Validate(string fields)
         {
-            if (!Regex.IsMatch(fields, ValidationPattern))
+            if (!_validationRegex.IsMatch(fields))
             {
                 return false;
             }
