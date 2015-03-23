@@ -27,7 +27,7 @@ namespace PartialResponse.Net.Http.Formatting
     {
         private readonly HttpRequestMessage _request;
 
-        private readonly IDictionary<string, Regex> _fieldMap = new Dictionary<string, Regex>();
+        private static readonly IDictionary<string, Regex> _fieldMap = new Dictionary<string, Regex>();
 
         private JsonSerializerSettings _jsonSerializerSettings;
         private int _maxDepth = FormattingUtilities.DefaultMaxDepth;
@@ -66,7 +66,7 @@ namespace PartialResponse.Net.Http.Formatting
 #endif
         }
 
-        private PartialJsonMediaTypeFormatter(HttpRequestMessage request)
+        protected PartialJsonMediaTypeFormatter(HttpRequestMessage request)
             : this()
         {
             _request = request;
@@ -364,18 +364,21 @@ namespace PartialResponse.Net.Http.Formatting
 
             Regex value;
 
-            if (!_fieldMap.TryGetValue(field, out value))
+            lock (_fieldMap)
             {
-                var pattern = PartialJsonMediaTypeFormatterUtilities.GetRegexPatternForField(field);
-                var regexOptions = RegexOptions.Compiled;
-
-                if (IgnoreCase)
+                if (!_fieldMap.TryGetValue(field, out value))
                 {
-                    regexOptions |= RegexOptions.IgnoreCase;
-                }
+                    var pattern = PartialJsonMediaTypeFormatterUtilities.GetRegexPatternForField(field);
+                    var regexOptions = RegexOptions.Compiled;
 
-                value = new Regex(pattern, regexOptions);
-                _fieldMap.Add(field, value);
+                    if (IgnoreCase)
+                    {
+                        regexOptions |= RegexOptions.IgnoreCase;
+                    }
+
+                    value = new Regex(pattern, regexOptions);
+                    _fieldMap.Add(field, value);
+                }
             }
 
             return _fields.Any(f => value.IsMatch(f));
